@@ -10,7 +10,7 @@ icon.filename = static/img/icon.png
 requirements = python3,flask,werkzeug==2.0.3,requests,pillow,sqlite3,edge-tts
 orientation = portrait
 fullscreen = 1
-android.permissions = INTERNET
+android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,READ_MEDIA_IMAGES,READ_MEDIA_VIDEO
 android.api = 33
 android.minapi = 24
 android.archs = arm64-v8a, armeabi-v7a
