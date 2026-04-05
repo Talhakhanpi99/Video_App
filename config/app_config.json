@@ -14,10 +14,9 @@
         "audio_generation": 4,
         "background_remove": 4,
         "overlay_compose": 10,
-        "position_preset": 20,
-        "pose_standardize": 12,
-        "background_resize": 12,
-        "pexels_search": 4
+        "image_resize": 12,
+        "pexels_search": 4,
+        "text_overlay": 12
       }
     },
     "pro": {
@@ -26,10 +25,9 @@
         "audio_generation": 50,
         "background_remove": 40,
         "overlay_compose": 100,
-        "position_preset": 200,
-        "pose_standardize": 120,
-        "background_resize": 120,
-        "pexels_search": 40
+        "image_resize": 120,
+        "pexels_search": 40,
+        "text_overlay": 120
       }
     }
   },
@@ -62,22 +60,8 @@
       "description": "Places a pose image or transparent clip on top of an image or video using x/y position, size, and opacity.",
       "best_for": "Character staging, meme overlays, pose placement, and reusable composition."
     },
-    "position_preset": {
-      "label": "Position Lock Presets",
-      "internet_required": false,
-      "tier_note": "Stores reusable x/y/width/height layouts like positionlock.py.",
-      "description": "Saves position and size presets for assets so the same character placement can be reused scene after scene.",
-      "best_for": "Consistent layouts, repeatable scene blocking, and faster batch edits."
-    },
-    "pose_standardize": {
-      "label": "Character Resize Ready",
-      "internet_required": false,
-      "tier_note": "Uses the same bottom-center ready.py style for character assets.",
-      "description": "Resizes a character or pose image to a standard canvas and anchors it bottom-center the same way as the existing ready.py flow.",
-      "best_for": "Preparing static poses, PNG cutouts, and standard mobile-frame character assets."
-    },
-    "background_resize": {
-      "label": "Background Resize",
+    "image_resize": {
+      "label": "Image Resize",
       "internet_required": false,
       "tier_note": "Uses the same blurred-fill flow from background_resize.py.",
       "description": "Resizes a full background image into a shorts-friendly frame using centered placement plus a blurred fill layer.",
@@ -89,6 +73,13 @@
       "tier_note": "Searches and downloads Pexels media through the API.",
       "description": "Searches the Pexels API with a text query and downloads matching images or clips into the app outputs.",
       "best_for": "Quick stock footage, scene references, filler visuals, and background sourcing."
+    },
+    "text_overlay": {
+      "label": "Text Overlay",
+      "internet_required": false,
+      "tier_note": "Lets the user place styled text on top of an image with export-ready settings.",
+      "description": "Adds customizable text to an image with color, size, and position controls for simple thumbnail or poster-style edits.",
+      "best_for": "Titles, labels, hooks, captions, and promo graphics."
     }
   },
   "ai": {
@@ -108,9 +99,30 @@
       ]
     },
     "tts": {
-      "voice_source": "youtube_shorts",
-      "default_speaker": "hamza",
-      "voice_profiles": {}
+      "voice_source": "custom_aliases",
+      "default_speaker": "male_voice_1",
+      "voice_profiles": {
+        "male_voice_1": {
+          "voice": "hi-IN-MadhurNeural",
+          "rate": "+5%",
+          "pitch": "+15Hz"
+        },
+        "male_voice_2": {
+          "voice": "hi-IN-MadhurNeural",
+          "rate": "+10%",
+          "pitch": "+25Hz"
+        },
+        "male_voice_3": {
+          "voice": "hi-IN-MadhurNeural",
+          "rate": "+0%",
+          "pitch": "+10Hz"
+        },
+        "female_voice_1": {
+          "voice": "hi-IN-SwaraNeural",
+          "rate": "+5%",
+          "pitch": "+15Hz"
+        }
+      }
     }
   },
   "billing": {
