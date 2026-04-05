@@ -6,17 +6,31 @@ on:
 jobs:
   build-android:
     runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: video_app
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Detect project directory
+        id: detect_project
+        shell: bash
+        run: |
+          if [ -f "video_app/buildozer.spec" ]; then
+            PROJECT_DIR="video_app"
+          elif [ -f "buildozer.spec" ]; then
+            PROJECT_DIR="."
+          else
+            echo "Could not find buildozer.spec in repo root or video_app/" >&2
+            exit 1
+          fi
+
+          echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+          echo "Detected project directory: $PROJECT_DIR"
+
       - name: Validate project layout
         shell: bash
         run: |
+          cd "${{ steps.detect_project.outputs.project_dir }}"
           test -f "buildozer.spec"
           test -f "main.py"
           test -f "templates/index.html"
@@ -50,11 +64,15 @@ jobs:
           pip install --upgrade buildozer "cython<3.0" virtualenv
 
       - name: Clean previous Android build cache
+        shell: bash
         run: |
+          cd "${{ steps.detect_project.outputs.project_dir }}"
           rm -rf .buildozer bin
 
       - name: Build APK with Buildozer
+        shell: bash
         run: |
+          cd "${{ steps.detect_project.outputs.project_dir }}"
           set -o pipefail
           buildozer -v android debug 2>&1 | tee buildozer-ci.log
 
@@ -63,11 +81,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: video-app-build-log
-          path: video_app/buildozer-ci.log
+          path: ${{ steps.detect_project.outputs.project_dir }}/buildozer-ci.log
           if-no-files-found: warn
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: video-app-apk
-          path: video_app/bin/*.apk
+          path: ${{ steps.detect_project.outputs.project_dir }}/bin/*.apk
