@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ config.app.title }}</title>
+    <link href="{{ url_for('static', filename='css/offline_bootstrap.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/offline_icons.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <header class="hero-shell">
+        <div class="hero-card">
+            <div class="hero-copy">
+                <span class="eyebrow">APK Structure Ready</span>
+                <h1>{{ config.app.title }}</h1>
+                <p>{{ config.app.subtitle }}</p>
+                <div class="hero-meta">
+                    <span>Version {{ config.app.version }}</span>
+                    <span>{{ "Online" if online else "Offline" }}</span>
+                    <span>{{ plan_status.plan_name if plan_status.active else "Free Tier" }}</span>
+                </div>
+            </div>
+            <div class="hero-actions">
+                <a class="btn btn-accent" href="{{ plan_status.checkout_url }}" target="_blank" rel="noopener">Buy Pro</a>
+                <a class="btn btn-outline-light" href="{{ url_for('plans') }}">Plans & Tools</a>
+                <button class="btn btn-outline-light" data-action="refresh-status">Refresh Status</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="page-shell">
+        <section class="status-grid">
+            <article class="panel">
+                <div class="panel-title">Tier Status</div>
+                <div class="status-pill {{ 'pro' if plan_status.active else 'free' }}">{{ 'Pro Active' if plan_status.active else 'Free Active' }}</div>
+                <p class="muted">Price: {{ plan_status.price_label }}</p>
+                {% if plan_status.expires_at %}
+                <p class="muted">Expires: {{ plan_status.expires_at }}</p>
+                {% endif %}
+                {% if plan_status.activation_key_tail %}
+                <p class="muted">Key ending: {{ plan_status.activation_key_tail }}</p>
+                {% endif %}
+                <form class="ajax-form" action="/api/activate" method="post" data-target="activation-result">
+                    <input class="form-control mb-2" type="text" name="email" placeholder="Email (optional)">
+                    <input class="form-control mb-2" type="text" name="activation_key" placeholder="Monthly activation key">
+                    <button class="btn btn-primary w-100" type="submit">Activate Pro</button>
+                </form>
+                <form class="ajax-form mt-2" action="/api/deactivate" method="post" data-target="activation-result">
+                    <button class="btn btn-secondary w-100" type="submit">Switch Back To Free</button>
+                </form>
+                <div class="result-box" id="activation-result"></div>
+            </article>
+
+            <article class="panel">
+                <div class="panel-title">Runtime Secrets</div>
+                <p class="muted">These values are saved in app-private runtime storage, not bundled into the APK.</p>
+                <form class="ajax-form" action="/api/secrets" method="post" data-target="secrets-result">
+                    {% for secret_name in config.secrets.slots %}
+                    <input class="form-control mb-2" type="password" name="{{ secret_name }}" placeholder="{{ secret_name }}">
+                    {% endfor %}
+                    <button class="btn btn-primary w-100" type="submit">Save Secrets</button>
+                </form>
+                {% if saved_secrets %}
+                <div class="saved-secrets">
+                    {% for key, value in saved_secrets.items() %}
+                    <div><strong>{{ key }}:</strong> {{ value }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <div class="result-box" id="secrets-result"></div>
+            </article>
+
+            <article class="panel quota-panel">
+                <div class="panel-title">Today's Quotas</div>
+                {% for feature_key, item in usage_summary.items() %}
+                <div class="quota-row">
+                    <div>
+                        <strong>{{ item.label }}</strong>
+                        <div class="muted small">{{ item.tier_note }}</div>
+                    </div>
+                    <div class="quota-value">
+                        {% if item.limit is none %}
+                        Unlimited
+                        {% else %}
+                        {{ item.used }}/{{ item.limit }}
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </article>
+        </section>
+
+        <section class="tool-grid">
+            <article class="tool-card">
+                <div class="tool-header">
+                    <h2>Script Generator</h2>
+                    <span class="net-tag online">Internet</span>
+                </div>
+                <form class="ajax-form" action="/api/script/generate" method="post" data-target="script-result">
+                    <input class="form-control mb-2" type="text" name="title_seed" placeholder="Title seed">
+                    <input class="form-control mb-2" type="text" name="scenario" placeholder="Scenario">
+                    <input class="form-control mb-2" type="text" name="location" placeholder="Location">
+                    <input class="form-control mb-2" type="number" name="character_count" placeholder="Character count" value="4">
+                    <input class="form-control mb-2" type="text" name="character_names" placeholder="Character names">
+                    <input class="form-control mb-2" type="text" name="hook" placeholder="Hook requirement">
+                    <textarea class="form-control mb-2" name="scene_1" rows="2" placeholder="Scene 1"></textarea>
+                    <textarea class="form-control mb-2" name="scene_2" rows="2" placeholder="Scene 2"></textarea>
+                    <textarea class="form-control mb-2" name="scene_3" rows="2" placeholder="Scene 3"></textarea>
+                    <textarea class="form-control mb-2" name="scene_4" rows="2" placeholder="Scene 4"></textarea>
+                    <textarea class="form-control mb-3" name="extra_notes" rows="2" placeholder="Extra instructions"></textarea>
+                    <button class="btn btn-primary w-100" type="submit">Generate Script</button>
+                </form>
+                <div class="result-box wide" id="script-result"></div>
+            </article>
+
+            <article class="tool-card">
+                <div class="tool-header">
+                    <h2>Audio Generation</h2>
+                    <span class="net-tag online">Internet</span>
+                </div>
+                <form class="ajax-form" action="/api/audio/generate" method="post" data-target="audio-result">
+                    <select class="form-select mb-2" name="speaker">
+                        <option value="hamza">Hamza</option>
+                        <option value="rafay">Rafay</option>
+                        <option value="sayam">Sayam</option>
+                        <option value="sana">Sana</option>
+                    </select>
+                    <textarea class="form-control mb-3" name="tts_text" rows="6" placeholder="Paste the final script or dialogue"></textarea>
+                    <button class="btn btn-primary w-100" type="submit">Generate Audio</button>
+                </form>
+                <div class="result-box" id="audio-result"></div>
+            </article>
+
+            <article class="tool-card">
+                <div class="tool-header">
+                    <h2>Background Remover</h2>
+                    <span class="net-tag mixed">Hybrid</span>
+                </div>
+                <form class="ajax-form" action="/api/background/remove" method="post" enctype="multipart/form-data" data-target="remove-result">
+                    <input class="form-control mb-3" type="file" name="media_file" accept=".png,.jpg,.jpeg,.webp,.mp4,.mov,.webm">
+                    <button class="btn btn-primary w-100" type="submit">Remove Background</button>
+                </form>
+                <div class="hint">Image removal follows the `poses_bg.py` style when local optional packages are available. Video removal follows `clip_bg.py` via `backgroundremover`.</div>
+                <div class="result-box" id="remove-result"></div>
+            </article>
+
+            <article class="tool-card">
+                <div class="tool-header">
+                    <h2>Static Pose or Clip Overlay</h2>
+                    <span class="net-tag offline">Offline</span>
+                </div>
+                <form class="ajax-form" action="/api/compose/overlay" method="post" enctype="multipart/form-data" data-target="compose-result">
+                    <label class="tiny-label">Base image or video</label>
+                    <input class="form-control mb-2" type="file" name="base_media" accept=".png,.jpg,.jpeg,.webp,.mp4,.mov,.webm">
+                    <label class="tiny-label">Overlay image or transparent clip</label>
+                    <input class="form-control mb-2" type="file" name="overlay_media" accept=".png,.jpg,.jpeg,.webp,.mp4,.mov,.webm">
+                    <div class="grid-2">
+                        <input class="form-control" type="number" name="x" placeholder="X">
+                        <input class="form-control" type="number" name="y" placeholder="Y">
+                    </div>
+                    <div class="grid-2 mt-2">
+                        <input class="form-control" type="number" name="width" placeholder="Width">
+                        <input class="form-control" type="number" name="height" placeholder="Height">
+                    </div>
+                    <input class="form-control mt-2 mb-3" type="number" step="0.1" min="0.1" max="1" name="opacity" placeholder="Opacity 0.1 - 1.0" value="1">
+                    <button class="btn btn-primary w-100" type="submit">Compose Media</button>
+                </form>
+                <div class="result-box" id="compose-result"></div>
+            </article>
+
+            <article class="tool-card">
+                <div class="tool-header">
+                    <h2>Position Lock Presets</h2>
+                    <span class="net-tag offline">Offline</span>
+                </div>
+                <form class="ajax-form" action="/api/layout/save" method="post" data-target="layout-result">
+                    <input class="form-control mb-2" type="text" name="scene_name" placeholder="Scene name">
+                    <input class="form-control mb-2" type="text" name="asset_name" placeholder="Character or asset name">
+                    <div class="grid-2">
+                        <input class="form-control" type="number" name="preset_x" placeholder="X">
+                        <input class="form-control" type="number" name="preset_y" placeholder="Y">
+                    </div>
+                    <div class="grid-2 mt-2">
+                        <input class="form-control" type="number" name="preset_width" placeholder="Width">
+                        <input class="form-control" type="number" name="preset_height" placeholder="Height">
+                    </div>
+                    <button class="btn btn-primary w-100 mt-3" type="submit">Save Preset</button>
+                </form>
+                <div class="hint">This mirrors the stored coordinate idea from `positionlock.py` without forcing a desktop editor inside the APK.</div>
+                <div class="result-box" id="layout-result"></div>
+            </article>
+
+            <article class="tool-card">
+                <div class="tool-header">
+                    <h2>Character Resize Ready</h2>
+                    <span class="net-tag offline">Offline</span>
+                </div>
+                <form class="ajax-form" action="/api/pose/standardize" method="post" enctype="multipart/form-data" data-target="pose-result">
+                    <input class="form-control mb-2" type="file" name="pose_file" accept=".png,.jpg,.jpeg,.webp">
+                    <div class="grid-2">
+                        <input class="form-control" type="number" name="canvas_width" value="720" placeholder="Canvas width">
+                        <input class="form-control" type="number" name="canvas_height" value="1280" placeholder="Canvas height">
+                    </div>
+                    <input class="form-control mt-2 mb-3" type="number" step="0.05" name="character_height_percent" value="0.75" placeholder="Character height percent">
+                    <button class="btn btn-primary w-100" type="submit">Make Ready Asset</button>
+                </form>
+                <div class="result-box" id="pose-result"></div>
+            </article>
+
+            <article class="tool-card">
+                <div class="tool-header">
+                    <h2>Background Resize</h2>
+                    <span class="net-tag offline">Offline</span>
+                </div>
+                <form class="ajax-form" action="/api/background/resize" method="post" enctype="multipart/form-data" data-target="bgresize-result">
+                    <input class="form-control mb-2" type="file" name="background_file" accept=".png,.jpg,.jpeg,.webp">
+                    <div class="grid-2">
+                        <input class="form-control" type="number" name="target_width" value="720" placeholder="Width">
+                        <input class="form-control" type="number" name="target_height" value="1280" placeholder="Height">
+                    </div>
+                    <button class="btn btn-primary w-100 mt-3" type="submit">Resize Background</button>
+                </form>
+                <div class="result-box" id="bgresize-result"></div>
+            </article>
+
+            <article class="tool-card">
+                <div class="tool-header">
+                    <h2>Pexels Search and Download</h2>
+                    <span class="net-tag online">Internet</span>
+                </div>
+                <form class="ajax-form" action="/api/pexels/search" method="post" data-target="pexels-result">
+                    <input class="form-control mb-2" type="text" name="query" placeholder="Search query">
+                    <select class="form-select mb-3" name="asset_type">
+                        <option value="image">Images</option>
+                        <option value="video">Videos</option>
+                    </select>
+                    <button class="btn btn-primary w-100" type="submit">Search Pexels</button>
+                </form>
+                <div class="result-box" id="pexels-result"></div>
+            </article>
+        </section>
+
+        <section class="outputs-panel">
+            <div class="panel-title">Recent Outputs</div>
+            <div class="outputs-grid" id="outputs-grid">
+                {% if outputs %}
+                    {% for item in outputs %}
+                    <a class="output-item" href="{{ item.download_url }}">
+                        <span class="output-feature">{{ item.feature.replace('_', ' ').title() }}</span>
+                        <strong>{{ item.title }}</strong>
+                        <span class="muted">{{ item.created_at }}</span>
+                    </a>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">No outputs yet. Run a tool and your downloads will appear here.</div>
+                {% endif %}
+            </div>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/offline_ui.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

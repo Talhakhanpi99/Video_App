@@ -1,0 +1,142 @@
+{
+  "app": {
+    "title": "Video App Studio",
+    "subtitle": "APK-ready SaaS shell for script, voice, image, and video tools",
+    "version": "0.1.0",
+    "package_name": "videoappstudio",
+    "package_domain": "com.promptpacks",
+    "support_contact": "support@example.com"
+  },
+  "limits": {
+    "free": {
+      "daily_quotas": {
+        "script_generation": 5,
+        "audio_generation": 4,
+        "background_remove": 4,
+        "overlay_compose": 10,
+        "position_preset": 20,
+        "pose_standardize": 12,
+        "background_resize": 12,
+        "pexels_search": 4
+      }
+    },
+    "pro": {
+      "daily_quotas": {
+        "script_generation": 50,
+        "audio_generation": 50,
+        "background_remove": 40,
+        "overlay_compose": 100,
+        "position_preset": 200,
+        "pose_standardize": 120,
+        "background_resize": 120,
+        "pexels_search": 40
+      }
+    }
+  },
+  "features": {
+    "script_generation": {
+      "label": "Script Generator",
+      "internet_required": true,
+      "tier_note": "Free gets a few daily prompts. Pro is for bulk script generation.",
+      "description": "Generates copyable short scripts using your small prompt plus fixed in-app rules for Roman Hindi / Urdu, Pakistan / India audience tone, and production-friendly pacing.",
+      "best_for": "Episode ideas, short scenes, dialogue drafts, hook lines, and cliffhangers."
+    },
+    "audio_generation": {
+      "label": "Audio Generation",
+      "internet_required": true,
+      "tier_note": "Uses the same voice profiles adapted from the working pipelines.",
+      "description": "Turns script text into downloadable speech using the same voice profile logic adapted from the production pipelines.",
+      "best_for": "Voiceovers, dialogue blocks, preview narration, and final speech exports."
+    },
+    "background_remove": {
+      "label": "Background Remover",
+      "internet_required": false,
+      "tier_note": "Offline if optional local engines are packaged. Otherwise wire a remote engine.",
+      "description": "Removes the background from an image or transparent clip source so characters and objects can be reused in edits.",
+      "best_for": "Character cutouts, pose assets, transparent overlays, and subject isolation."
+    },
+    "overlay_compose": {
+      "label": "Static Pose or Clip Overlay",
+      "internet_required": false,
+      "tier_note": "Image overlay works locally. Video overlay needs MoviePy at runtime.",
+      "description": "Places a pose image or transparent clip on top of an image or video using x/y position, size, and opacity.",
+      "best_for": "Character staging, meme overlays, pose placement, and reusable composition."
+    },
+    "position_preset": {
+      "label": "Position Lock Presets",
+      "internet_required": false,
+      "tier_note": "Stores reusable x/y/width/height layouts like positionlock.py.",
+      "description": "Saves position and size presets for assets so the same character placement can be reused scene after scene.",
+      "best_for": "Consistent layouts, repeatable scene blocking, and faster batch edits."
+    },
+    "pose_standardize": {
+      "label": "Character Resize Ready",
+      "internet_required": false,
+      "tier_note": "Uses the same bottom-center ready.py style for character assets.",
+      "description": "Resizes a character or pose image to a standard canvas and anchors it bottom-center the same way as the existing ready.py flow.",
+      "best_for": "Preparing static poses, PNG cutouts, and standard mobile-frame character assets."
+    },
+    "background_resize": {
+      "label": "Background Resize",
+      "internet_required": false,
+      "tier_note": "Uses the same blurred-fill flow from background_resize.py.",
+      "description": "Resizes a full background image into a shorts-friendly frame using centered placement plus a blurred fill layer.",
+      "best_for": "Portrait video backgrounds, story scenes, and reused landscape art."
+    },
+    "pexels_search": {
+      "label": "Pexels Search and Download",
+      "internet_required": true,
+      "tier_note": "Searches and downloads Pexels media through the API.",
+      "description": "Searches the Pexels API with a text query and downloads matching images or clips into the app outputs.",
+      "best_for": "Quick stock footage, scene references, filler visuals, and background sourcing."
+    }
+  },
+  "ai": {
+    "script_generation": {
+      "model": "gemini-2.5-flash",
+      "temperature": 0.85,
+      "top_p": 0.95,
+      "top_k": 40,
+      "max_output_tokens": 1600,
+      "timeout_seconds": 90,
+      "style_rules": [
+        "Use modern Roman Urdu / Roman Hindi with a desi internet vibe.",
+        "Keep the pacing sharp and retain the chaotic energy from the existing episode pipeline.",
+        "Make the lines readable for Pakistan and India audiences.",
+        "Avoid formal Urdu and avoid JSON output.",
+        "Keep scenes clip-worthy and useful for video production."
+      ]
+    },
+    "tts": {
+      "voice_source": "youtube_shorts",
+      "default_speaker": "hamza",
+      "voice_profiles": {}
+    }
+  },
+  "billing": {
+    "plan_name": "Pro Monthly",
+    "price_label": "PKR 2,499 / month",
+    "checkout_url": "https://example.com/pay/video-app-pro",
+    "activation_verify_url": "https://example.com/api/licenses/verify",
+    "demo_key_prefix": "DEMO-PRO-",
+    "demo_duration_days": 30
+  },
+  "pexels": {
+    "per_page": 4
+  },
+  "storage": {
+    "keep_latest_outputs": 60
+  },
+  "secrets": {
+    "slots": [
+      "gemini_api_key",
+      "pexels_api_key",
+      "license_service_token"
+    ]
+  },
+  "network": {
+    "connectivity_probe_host": "1.1.1.1",
+    "connectivity_probe_port": 53,
+    "timeout_seconds": 3
+  }
+}
