@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ config.app.title }}</title>
+    <link href="{{ url_for('static', filename='css/offline_bootstrap.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/offline_icons.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body class="studio-body">
+    <header class="studio-hero">
+        <div class="studio-glow studio-glow-a"></div>
+        <div class="studio-glow studio-glow-b"></div>
+        <div class="page-shell hero-layout">
+            <div class="hero-copy">
+                <span class="eyebrow">Creative Video Toolkit</span>
+                <h1>{{ config.app.title }}</h1>
+                <p>{{ config.app.subtitle }}</p>
+                <div class="hero-meta">
+                    <span>{{ "Online" if online else "Offline" }}</span>
+                    <span>{{ "Pro Active" if plan_status.active else "Free Active" }}</span>
+                    <span>Version {{ config.app.version }}</span>
+                </div>
+            </div>
+            <div class="hero-actions">
+                <a class="btn btn-accent" href="{{ config.billing.checkout_url }}" target="_blank" rel="noopener">Buy Pro</a>
+                <a class="btn btn-outline-light" href="{{ url_for('plans') }}">Plans & Tools</a>
+                <button class="btn btn-outline-light" data-open-modal="quota-modal">Today's Quotas</button>
+                <button class="btn btn-outline-light" data-open-modal="secrets-modal">Runtime Secrets</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="page-shell dashboard-stack">
+        <section class="tool-launch-grid">
+            {% for tool in visible_tools %}
+            <a class="launch-card" href="{{ url_for('tool_page', tool_key=tool.key) }}">
+                <div class="launch-badge">{{ "Internet" if tool.internet_required else "Offline" }}</div>
+                <h2>{{ tool.label }}</h2>
+                <p>{{ tool.description }}</p>
+                <span class="launch-link">Open Tool</span>
+            </a>
+            {% endfor %}
+        </section>
+
+        <section class="outputs-panel">
+            <div class="panel-title">Recent Outputs</div>
+            <div class="outputs-grid" id="outputs-grid">
+                {% if outputs %}
+                    {% for item in outputs %}
+                    <a class="output-item" href="{{ item.download_url }}">
+                        <span class="output-feature">{{ item.feature.replace('_', ' ').title() }}</span>
+                        <strong>{{ item.title }}</strong>
+                        <span class="muted">{{ item.created_at }}</span>
+                    </a>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">No outputs yet. Open any tool page and your downloads will appear here.</div>
+                {% endif %}
+            </div>
+        </section>
+    </main>
+
+    <div class="modal-shell" id="quota-modal" hidden>
+        <div class="modal-card">
+            <button class="modal-close" data-close-modal="quota-modal">x</button>
+            <h2>Today's Quotas</h2>
+            {% for feature_key, item in usage_summary.items() %}
+            <div class="quota-row">
+                <div>
+                    <strong>{{ item.label }}</strong>
+                    <div class="muted small">Used {{ item.used }} time(s)</div>
+                </div>
+                <div class="quota-value">
+                    {% if item.limit is none %}Unlimited{% else %}{{ item.used }}/{{ item.limit }}{% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="modal-shell" id="secrets-modal" hidden>
+        <div class="modal-card">
+            <button class="modal-close" data-close-modal="secrets-modal">x</button>
+            <h2>Runtime Secrets</h2>
+            <p class="muted">Runtime secrets are values like your Gemini API key or Pexels API key. They are saved after install inside the app's private storage on the phone, instead of being bundled openly inside the APK files.</p>
+            <p class="muted">How to use them:</p>
+            <div class="hint">
+                1. Open a tool that needs internet.
+                2. Save your key once.
+                3. The app reads it from private runtime storage on later launches.
+            </div>
+            <p class="muted">Important: this is safer than shipping keys inside the APK, but it is still not perfect protection against a rooted device or reverse engineering.</p>
+            <form class="ajax-form" action="/api/secrets" method="post" data-target="secrets-result">
+                {% for secret_name in config.secrets.slots %}
+                <input class="form-control mb-2" type="password" name="{{ secret_name }}" placeholder="{{ secret_name }}">
+                {% endfor %}
+                <button class="btn btn-primary w-100" type="submit">Save Secrets</button>
+            </form>
+            <div class="result-box" id="secrets-result"></div>
+            {% if saved_secrets %}
+            <div class="saved-secrets">
+                {% for key, value in saved_secrets.items() %}
+                <div><strong>{{ key }}:</strong> {{ value }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/offline_ui.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

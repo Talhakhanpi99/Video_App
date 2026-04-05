@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ tool.label }} - {{ config.app.title }}</title>
+    <link href="{{ url_for('static', filename='css/offline_bootstrap.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/offline_icons.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body class="studio-body">
+    <header class="tool-hero">
+        <div class="page-shell hero-layout compact">
+            <div class="hero-copy">
+                <span class="eyebrow">{{ "Internet Tool" if tool.internet_required else "Offline Tool" }}</span>
+                <h1>{{ tool.label }}</h1>
+                <p>{{ tool.description }}</p>
+            </div>
+            <div class="hero-actions">
+                <a class="btn btn-outline-light" href="{{ url_for('index') }}">Back Home</a>
+                <a class="btn btn-accent" href="{{ url_for('plans') }}">Plans & Tools</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="page-shell tool-page-stack">
+        <section class="single-tool-card">
+            {% if tool_key == 'script_generation' %}
+            <form class="ajax-form" action="/api/script/generate" method="post" data-target="tool-result">
+                <textarea class="form-control mb-3 large-input" name="instructions" rows="8" placeholder="Write what kind of script you want. Example: A desktop PC and laptop are arguing about which one is better. Make it funny, emotional, and natural."></textarea>
+                <input class="form-control mb-2" type="text" name="character_names" placeholder="Character names (optional)">
+                <div class="grid-2">
+                    <input class="form-control" type="number" name="character_count" value="1" placeholder="Character count">
+                    <input class="form-control" type="text" name="tone" placeholder="Tone (funny, serious, dramatic)">
+                </div>
+                <div class="grid-2 mt-2">
+                    <input class="form-control" type="text" name="format_type" placeholder="Format (single scene, skit, episode, ad)">
+                    <input class="form-control" type="text" name="length_hint" placeholder="Length hint">
+                </div>
+                <input class="form-control mt-2" type="text" name="location" placeholder="Location or world (optional)">
+                <textarea class="form-control mt-2 mb-3" name="extra_notes" rows="3" placeholder="Extra constraints or story notes"></textarea>
+                <button class="btn btn-primary w-100" type="submit">Generate Script</button>
+            </form>
+            {% elif tool_key == 'audio_generation' %}
+            <form class="ajax-form" action="/api/audio/generate" method="post" data-target="tool-result">
+                <select class="form-select mb-2" name="speaker">
+                    {% for voice_key in voice_options %}
+                    <option value="{{ voice_key }}">{{ voice_key.replace('_', ' ').title() }}</option>
+                    {% endfor %}
+                </select>
+                <textarea class="form-control mb-3 large-input" name="tts_text" rows="8" placeholder="Paste the text you want to convert into speech"></textarea>
+                <button class="btn btn-primary w-100" type="submit">Generate Audio</button>
+            </form>
+            {% elif tool_key == 'background_remove' %}
+            <form class="ajax-form" action="/api/background/remove" method="post" enctype="multipart/form-data" data-target="tool-result">
+                <input class="form-control mb-3" type="file" name="media_file" accept=".png,.jpg,.jpeg,.webp,.mp4,.mov,.webm">
+                <button class="btn btn-primary w-100" type="submit">Remove Background</button>
+            </form>
+            {% elif tool_key == 'overlay_compose' %}
+            <form class="ajax-form overlay-builder-form" action="/api/compose/overlay" method="post" enctype="multipart/form-data" data-target="tool-result">
+                <input class="form-control mb-2" type="file" name="base_media" id="base-media-input" accept=".png,.jpg,.jpeg,.webp,.mp4,.mov,.webm">
+                <input class="form-control mb-2" type="file" name="overlay_media" id="overlay-media-input" accept=".png,.jpg,.jpeg,.webp" multiple>
+                <input type="hidden" name="placements_json" id="placements-json">
+                <div class="canvas-stage">
+                    <canvas id="overlay-canvas" width="720" height="1280"></canvas>
+                </div>
+                <div class="hint">Add a base image or video, then add one or more overlay images. Drag them on the canvas before saving.</div>
+                <button class="btn btn-primary w-100 mt-3" type="submit">Save Overlay Result</button>
+            </form>
+            {% elif tool_key == 'image_resize' %}
+            <form class="ajax-form" action="/api/background/resize" method="post" enctype="multipart/form-data" data-target="tool-result">
+                <input class="form-control mb-2" type="file" name="background_file" accept=".png,.jpg,.jpeg,.webp">
+                <div class="grid-2">
+                    <input class="form-control" type="number" name="target_width" value="720" placeholder="Width">
+                    <input class="form-control" type="number" name="target_height" value="1280" placeholder="Height">
+                </div>
+                <button class="btn btn-primary w-100 mt-3" type="submit">Resize Image</button>
+            </form>
+            {% elif tool_key == 'text_overlay' %}
+            <form class="ajax-form" action="/api/text/overlay" method="post" enctype="multipart/form-data" data-target="tool-result">
+                <input class="form-control mb-2" type="file" name="background_file" accept=".png,.jpg,.jpeg,.webp">
+                <textarea class="form-control mb-2" name="overlay_text" rows="4" placeholder="Write the text to place on the image"></textarea>
+                <div class="grid-2">
+                    <input class="form-control" type="number" name="text_x" value="40" placeholder="X">
+                    <input class="form-control" type="number" name="text_y" value="40" placeholder="Y">
+                </div>
+                <div class="grid-2 mt-2">
+                    <input class="form-control" type="number" name="font_size" value="48" placeholder="Font size">
+                    <input class="form-control" type="text" name="fill_color" value="#ffffff" placeholder="Color">
+                </div>
+                <button class="btn btn-primary w-100 mt-3" type="submit">Create Text Overlay</button>
+            </form>
+            {% elif tool_key == 'pexels_search' %}
+            <form class="ajax-form" action="/api/pexels/search" method="post" data-target="tool-result">
+                <input class="form-control mb-2" type="text" name="query" placeholder="Search query">
+                <select class="form-select mb-3" name="asset_type">
+                    <option value="image">Images</option>
+                    <option value="video">Videos</option>
+                </select>
+                <button class="btn btn-primary w-100" type="submit">Search Pexels</button>
+            </form>
+            {% endif %}
+            <div class="result-box wide" id="tool-result"></div>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/offline_ui.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
