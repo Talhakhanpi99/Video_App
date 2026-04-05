@@ -14,8 +14,9 @@ from flask import Flask, abort, jsonify, render_template, request, send_from_dir
 from werkzeug.utils import secure_filename
 
 from services.pipeline_adapters import (
-    compose_overlay_image,
-    compose_overlay_video,
+    add_text_overlay_to_image,
+    compose_multiple_overlays_image,
+    compose_multiple_overlays_video,
     generate_gemini_script,
     generate_tts_audio,
     remove_image_background,
@@ -31,6 +32,15 @@ APP_DIR = Path(__file__).resolve().parent
 PUBLIC_CONFIG_PATH = APP_DIR / "config" / "app_config.json"
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = int(os.environ.get("VIDEO_APP_PORT", "5000"))
+VISIBLE_TOOL_KEYS = [
+    "script_generation",
+    "audio_generation",
+    "background_remove",
+    "overlay_compose",
+    "image_resize",
+    "text_overlay",
+    "pexels_search",
+]
 
 
 def load_json(path: Path, default: Any) -> Any:
@@ -375,13 +385,14 @@ def index():
     usage_summary = get_usage_summary(config, plan_status)
     secrets = get_secrets()
     return render_template(
-        "index.html",
+        "dashboard.html",
         config=config,
         plan_status=plan_status,
         usage_summary=usage_summary,
         outputs=get_outputs_feed(),
         online=has_connectivity(config),
         saved_secrets={key: mask_key(value) for key, value in secrets.items() if value},
+        visible_tools=[{"key": key, **config["features"][key]} for key in VISIBLE_TOOL_KEYS],
     )
 
 
@@ -394,6 +405,23 @@ def plans():
         config=config,
         plan_status=plan_status,
         online=has_connectivity(config),
+    )
+
+
+@app.route("/tool/<tool_key>")
+def tool_page(tool_key: str):
+    config = get_public_config()
+    if tool_key not in config.get("features", {}) or tool_key not in VISIBLE_TOOL_KEYS:
+        abort(404)
+    return render_template(
+        "tool.html",
+        config=config,
+        tool_key=tool_key,
+        tool=config["features"][tool_key],
+        plan_status=get_plan_status(config),
+        usage_summary=get_usage_summary(config, get_plan_status(config)),
+        online=has_connectivity(config),
+        voice_options=list(config.get("ai", {}).get("tts", {}).get("voice_profiles", {}).keys()),
     )
 
 
@@ -545,22 +573,31 @@ def api_overlay_compose():
     try:
         ensure_quota(config, feature_key, plan_status)
         base_file = save_upload(request.files.get("base_media"), f"{feature_key}/base")
-        overlay_file = save_upload(request.files.get("overlay_media"), f"{feature_key}/overlay")
-        x = int(request.form.get("x", 0) or 0)
-        y = int(request.form.get("y", 0) or 0)
-        width = request.form.get("width", "").strip()
-        height = request.form.get("height", "").strip()
-        opacity = float(request.form.get("opacity", "1.0") or "1.0")
+        placement_specs = json.loads(request.form.get("placements_json", "[]") or "[]")
+        overlay_files = request.files.getlist("overlay_media")
+        saved_overlays = []
+        overlay_dir = get_inputs_root() / f"{feature_key}/overlay"
+        overlay_dir.mkdir(parents=True, exist_ok=True)
 
-        target_width = int(width) if width else None
-        target_height = int(height) if height else None
+        for index, upload in enumerate(overlay_files):
+            if not upload or not upload.filename:
+                continue
+            destination = overlay_dir / f"{uuid.uuid4().hex}_{secure_filename(upload.filename)}"
+            upload.save(destination)
+            spec = placement_specs[index] if index < len(placement_specs) else {}
+            spec["path"] = str(destination)
+            saved_overlays.append(spec)
+
+        if not saved_overlays:
+            raise RuntimeError("Please add at least one overlay file.")
+
         output_dir = ensure_output_folder(feature_key)
         if base_file.suffix.lower() in {".mp4", ".mov", ".webm"}:
             output_path = output_dir / f"{base_file.stem}_overlay.mp4"
-            compose_overlay_video(base_file, overlay_file, output_path, x, y, target_width, target_height, opacity)
+            compose_multiple_overlays_video(base_file, saved_overlays, output_path)
         else:
             output_path = output_dir / f"{base_file.stem}_overlay.png"
-            compose_overlay_image(base_file, overlay_file, output_path, x, y, target_width, target_height, opacity)
+            compose_multiple_overlays_image(base_file, saved_overlays, output_path)
     except Exception as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400
 
@@ -598,34 +635,11 @@ def api_layout_save():
     return jsonify({"ok": True, "message": "Layout preset saved.", "preset": preset})
 
 
-@app.post("/api/pose/standardize")
-def api_pose_standardize():
-    config = get_public_config()
-    plan_status = get_plan_status(config)
-    feature_key = "pose_standardize"
-
-    try:
-        ensure_quota(config, feature_key, plan_status)
-        upload = save_upload(request.files.get("pose_file"), feature_key)
-        canvas_width = int(request.form.get("canvas_width", 720) or 720)
-        canvas_height = int(request.form.get("canvas_height", 1280) or 1280)
-        height_percent = float(request.form.get("character_height_percent", "0.75") or "0.75")
-        output_dir = ensure_output_folder(feature_key)
-        output_path = output_dir / f"{upload.stem}_ready.png"
-        standardize_pose_image(upload, output_path, canvas_width, canvas_height, height_percent)
-    except Exception as exc:
-        return jsonify({"ok": False, "message": str(exc)}), 400
-
-    record_usage(feature_key)
-    output = register_output(feature_key, output_path, "Character Asset Ready")
-    return jsonify({"ok": True, "message": "Character asset resized.", "output": output})
-
-
 @app.post("/api/background/resize")
 def api_background_resize():
     config = get_public_config()
     plan_status = get_plan_status(config)
-    feature_key = "background_resize"
+    feature_key = "image_resize"
 
     try:
         ensure_quota(config, feature_key, plan_status)
@@ -639,8 +653,33 @@ def api_background_resize():
         return jsonify({"ok": False, "message": str(exc)}), 400
 
     record_usage(feature_key)
-    output = register_output(feature_key, output_path, "Background Resized")
-    return jsonify({"ok": True, "message": "Background resized.", "output": output})
+    output = register_output(feature_key, output_path, "Image Resized")
+    return jsonify({"ok": True, "message": "Image resized.", "output": output})
+
+
+@app.post("/api/text/overlay")
+def api_text_overlay():
+    config = get_public_config()
+    plan_status = get_plan_status(config)
+    feature_key = "text_overlay"
+
+    try:
+        ensure_quota(config, feature_key, plan_status)
+        upload = save_upload(request.files.get("background_file"), feature_key)
+        text = request.form.get("overlay_text", "").strip()
+        x = int(request.form.get("text_x", 40) or 40)
+        y = int(request.form.get("text_y", 40) or 40)
+        font_size = int(request.form.get("font_size", 48) or 48)
+        fill_color = request.form.get("fill_color", "#ffffff").strip() or "#ffffff"
+        output_dir = ensure_output_folder(feature_key)
+        output_path = output_dir / f"{upload.stem}_text.png"
+        add_text_overlay_to_image(upload, output_path, text, x, y, font_size, fill_color)
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+
+    record_usage(feature_key)
+    output = register_output(feature_key, output_path, "Text Overlay")
+    return jsonify({"ok": True, "message": "Text overlay created.", "output": output})
 
 
 @app.post("/api/pexels/search")
