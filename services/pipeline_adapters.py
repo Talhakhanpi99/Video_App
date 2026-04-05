@@ -59,11 +59,10 @@ def _download_to_path(url: str, destination: Path, headers: dict[str, str] | Non
 
 def build_script_prompt(user_inputs: dict[str, str], script_settings: dict[str, Any]) -> str:
     style_rules = "\n".join(f"- {rule}" for rule in script_settings.get("style_rules", []))
-    scene_count = int(user_inputs.get("scene_count") or 4)
-    character_count = int(user_inputs.get("character_count") or 4)
+    character_count = int(user_inputs.get("character_count") or 1)
 
     return f"""
-You are an expert scriptwriter for a chaotic, GenZ-focused animated comedy series and high-retention short episodes.
+You are an expert scriptwriter for short scenes, skits, episodes, ad-style dialogues, and dramatic or comedic scripts.
 
 CRITICAL FIXED CONTEXT:
 - Language: Roman Urdu / Roman Hindi mix
@@ -73,54 +72,38 @@ CRITICAL FIXED CONTEXT:
 - Never return JSON
 - Keep the script copyable
 - Keep dialogue lines punchy and natural
+- The user may ask for one scene, many scenes, a short script, or a longer dramatic setup
+- Adapt to whatever story structure the user asks for instead of forcing one template
 
 FOLLOW THESE STYLE RULES:
 {style_rules}
 
 USER BRIEF:
-- Title seed: {user_inputs.get("title_seed", "").strip()}
-- Scenario: {user_inputs.get("scenario", "").strip()}
-- Location: {user_inputs.get("location", "").strip()}
+- Main instruction: {user_inputs.get("instructions", "").strip()}
 - Character count: {character_count}
 - Character names: {user_inputs.get("character_names", "").strip()}
-- Scene count: {scene_count}
-- Hook requirement: {user_inputs.get("hook", "").strip()}
-- Scene 1: {user_inputs.get("scene_1", "").strip()}
-- Scene 2: {user_inputs.get("scene_2", "").strip()}
-- Scene 3: {user_inputs.get("scene_3", "").strip()}
-- Scene 4: {user_inputs.get("scene_4", "").strip()}
+- Desired tone: {user_inputs.get("tone", "").strip()}
+- Desired format: {user_inputs.get("format_type", "").strip()}
+- Desired length: {user_inputs.get("length_hint", "").strip()}
+- Location or world: {user_inputs.get("location", "").strip()}
+- Extra constraints: {user_inputs.get("extra_notes", "").strip()}
 - Extra instructions: {user_inputs.get("extra_notes", "").strip()}
 
 STRUCTURE REQUIRED:
-Title:
-[one catchy title]
-
-Hook:
-[3 to 5 very fast lines]
-
-Scene 1:
-CHARACTER: line
-
-Scene 2:
-CHARACTER: line
-
-Scene 3:
-CHARACTER: line
-
-Scene 4:
-CHARACTER: line
-
-Cliffhanger:
-[2 to 4 closing lines]
+- If the user asks for a single scene, return exactly that scene.
+- If the user asks for multiple scenes, label them clearly.
+- If the user asks for dialogue only, return dialogue only.
+- If the user asks for a short film style script, include scene headings.
+- Always keep the output easy to copy.
 
 Hard rules:
 - Use only the characters provided by the user.
-- Background or stage context can be implied in 1 short line before each scene.
+- If no names are provided, invent suitable names only when needed.
 - Avoid old fashioned Urdu.
 - Avoid full English sentences unless a brand or slang word sounds better in English.
 - Keep it advertiser-friendly.
 - Every 2 to 3 lines should move conflict, humor, or tension forward.
-- Make it sound like the production logic from the existing episode and shorts pipelines.
+- Make it flexible and universal rather than tied to one pipeline scene format.
 """.strip()
 
 
@@ -176,9 +159,14 @@ def generate_tts_audio(text: str, speaker: str, output_path: Path, config: dict[
         raise RuntimeError("edge-tts is not installed. Add it to your runtime if you want on-device TTS.") from exc
 
     voice_map = config.get("voice_profiles", {})
-    source_pool = YOUTUBE_SHORTS_VOICES if config.get("voice_source") == "youtube_shorts" else ANIMATION_VOICES
-    merged = {**source_pool, **voice_map}
-    voice_cfg = merged.get(speaker.lower(), merged.get(config.get("default_speaker", "hamza"), ANIMATION_VOICES["hamza"]))
+    if voice_map:
+        merged = voice_map
+        default_key = config.get("default_speaker", next(iter(voice_map.keys()), "male_voice_1"))
+        voice_cfg = merged.get(speaker.lower(), merged.get(default_key, next(iter(merged.values()))))
+    else:
+        source_pool = YOUTUBE_SHORTS_VOICES if config.get("voice_source") == "youtube_shorts" else ANIMATION_VOICES
+        merged = {**source_pool}
+        voice_cfg = merged.get(speaker.lower(), merged.get("hamza", ANIMATION_VOICES["hamza"]))
 
     async def _run() -> None:
         communicate = edge_tts.Communicate(
@@ -256,6 +244,31 @@ def compose_overlay_image(
     return output_path
 
 
+def compose_multiple_overlays_image(
+    base_path: Path,
+    overlay_specs: list[dict[str, Any]],
+    output_path: Path,
+) -> Path:
+    base = Image.open(base_path).convert("RGBA")
+    for spec in overlay_specs:
+        overlay = Image.open(spec["path"]).convert("RGBA")
+        width = int(spec.get("width") or overlay.width)
+        height = int(spec.get("height") or overlay.height)
+        x = int(spec.get("x") or 0)
+        y = int(spec.get("y") or 0)
+        opacity = float(spec.get("opacity") or 1.0)
+
+        overlay = overlay.resize((width, height), Image.Resampling.LANCZOS)
+        if opacity < 1.0:
+            alpha = overlay.getchannel("A")
+            alpha = alpha.point(lambda px: int(px * max(0.0, min(1.0, opacity))))
+            overlay.putalpha(alpha)
+        base.paste(overlay, (x, y), overlay)
+
+    base.save(output_path, "PNG")
+    return output_path
+
+
 def compose_overlay_video(
     base_path: Path,
     overlay_path: Path,
@@ -290,6 +303,71 @@ def compose_overlay_video(
     overlay_clip = overlay_clip.with_position((x, y)).with_opacity(opacity)
     final = CompositeVideoClip([base_clip, overlay_clip], size=base_clip.size)
     final.write_videofile(str(output_path), codec="libx264", audio_codec="aac", logger=None)
+    return output_path
+
+
+def compose_multiple_overlays_video(
+    base_path: Path,
+    overlay_specs: list[dict[str, Any]],
+    output_path: Path,
+) -> Path:
+    try:
+        from moviepy import CompositeVideoClip, ImageClip, VideoFileClip  # type: ignore
+        import moviepy.video.fx as vfx  # type: ignore
+    except ImportError as exc:
+        raise RuntimeError("moviepy is not installed. Add it if you want video overlay inside the APK.") from exc
+
+    base_clip = VideoFileClip(str(base_path))
+    layers: list[Any] = [base_clip]
+
+    for spec in overlay_specs:
+        overlay_path = Path(spec["path"])
+        ext = overlay_path.suffix.lower()
+        if ext in {".png", ".jpg", ".jpeg", ".webp"}:
+            overlay_clip = ImageClip(str(overlay_path)).with_duration(base_clip.duration)
+        else:
+            overlay_clip = VideoFileClip(str(overlay_path)).without_audio().with_duration(base_clip.duration)
+
+        width = spec.get("width")
+        height = spec.get("height")
+        resize_kwargs = {}
+        if width:
+            resize_kwargs["width"] = int(width)
+        if height:
+            resize_kwargs["height"] = int(height)
+        if resize_kwargs:
+            overlay_clip = overlay_clip.with_effects([vfx.Resize(**resize_kwargs)])
+
+        overlay_clip = overlay_clip.with_position((int(spec.get("x") or 0), int(spec.get("y") or 0))).with_opacity(float(spec.get("opacity") or 1.0))
+        layers.append(overlay_clip)
+
+    final = CompositeVideoClip(layers, size=base_clip.size)
+    final.write_videofile(str(output_path), codec="libx264", audio_codec="aac", logger=None)
+    return output_path
+
+
+def add_text_overlay_to_image(
+    base_path: Path,
+    output_path: Path,
+    text: str,
+    x: int,
+    y: int,
+    font_size: int = 48,
+    fill_color: str = "#ffffff",
+) -> Path:
+    from PIL import ImageDraw, ImageFont
+
+    base = Image.open(base_path).convert("RGBA")
+    draw = ImageDraw.Draw(base)
+
+    try:
+        font = ImageFont.truetype("arial.ttf", font_size)
+    except Exception:
+        font = ImageFont.load_default()
+
+    draw.text((x + 2, y + 2), text, font=font, fill=(0, 0, 0, 180))
+    draw.text((x, y), text, font=font, fill=fill_color)
+    base.save(output_path, "PNG")
     return output_path
 
 
